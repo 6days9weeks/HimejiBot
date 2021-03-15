@@ -1,66 +1,90 @@
-import os #needs rewriting/ugly coding
 import discord
+
+import typing
+
+from utils.misc import check_hierachy
 
 from discord.ext import commands
 
 
-class moderation(commands.Cog, name="moderation"):
+class Moderation(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command(brief = 'Kicks a member', aliases = ['k', 'boot'])
-    @commands.has_permissions(kick_members = True)
-    async def kick(self, ctx, member : discord.Member, *, reason=None):
-        await member.kick(reason=reason)
-        embed = discord.Embed(
-            description=f"Sucessfully Kicked {member.mention} for {reason} from {ctx.guild}",
-            color=0x000000
-        )
-        await ctx.send(embed=embed)
-        await member.send(f'You were kicked from {context.guild} for {reason}.')
+    @commands.command()
+    @commands.cooldown(1, 3, commands.BucketType.user)
+    @commands.guild_only()
+    @commands.has_permissions(kick_members=True)
+    async def kick(self, ctx, member: discord.Member, reason=None):
+        """Kicks a user"""
+        if await check_hierachy(ctx, member):
+            return
 
-    @commands.command(brief = 'Nickname a member', aliaes = ['nickname'])
-    @commands.has_permissions(manage_nicknames = True)
-    async def nick(self, ctx, member : discord.Member, name : str):
-        embed = discord.Embed(
-            description=f"Changed {member.mention}'s Nickname to {name}",
-            color=0x000000
-        )
-        await ctx.send(embed=embed)
-        await member.change_nickname(name)
-
-    @commands.command(brief = 'Ban People', aliases = ['b'])
-    @commands.has_permissions(ban_member = True)
-    async def ban(self, ctx, member : discord.Member, *, reason=reason):
-        embed = discord.Member(
-            description=f"Banned {member.mention} for {reason} from {ctx.guild} ",
-            color=0x000000
-        )
-        await ctx.send(embed=embed)
-        await member.send(f'You were banned from {ctx.guild} for {reason}')
+        try:
+            await member.kick(reason=f"{reason} - {ctx.author.name}")
+            await ctx.send(f"⚠️{member.name} was kicked for {reason}")
+            await member.send(f"⚠️You were kicked from {ctx.guild} for {reason}")
+        except Exception as e:
+            await ctx.send(e)
 
     @commands.command()
-    @commands.has_permissions(kick_member = True)
-    async def warn(self, ctx, member : discord.Member, *, reason=None):
-        embed = discord.Embed(
-            description=f"{member.mention} has been warned by {ctx.author.mention}",
-            color=0x000000
-        )
-        embed.add_field(
-            name="Reason:",
-            value=f"{reason}",
-            inline=True
-        )
-        await ctx.send(embed=embed)
+    @commands.cooldown(1, 3, commands.BucketType.user)
+    @commands.guild_only()
+    @commands.has_permissions(ban_members=True)
+    async def ban(self, ctx, member: discord.Member, *, reason=None):
+        """Bans a user"""
+        if await check_hierachy(ctx, member):
+            return
 
-    @commands.command(brief = 'clears messages', alises = ['prune', 'clear'])
-    async def purge(self, ctx, *, amount = None):
-        embed = discord.Embed(
-            description=f"Cleared {amount} of messages",
-            color=0x000000
-        )    
-        await ctx.channel.purge(limit=amount)
-        await ctx.send(embed=embed)
+        try:
+            await member.ban(reason=f"{reason} - {ctx.author.name}")
+            await ctx.send(f"🔴{member.name} was banned for {reason}")
+            await member.send(f"🔴You were banned from {ctx.guild} for {reason}")
+        except Exception as e:
+            await ctx.send(e)
+
+    @commands.command()
+    @commands.cooldown(1, 3, commands.BucketType.user)
+    @commands.guild_only()
+    @commands.has_permissions(manage_nicknames=True)
+    async def nickname(self, ctx, member: discord.Member, *, nickname=None):
+        """Nicknames a user"""
+        if await check.hierachy(ctx, member):
+            return
+
+        try:
+            if nickname is None:
+                await member.edit(nick=member.name)
+                await ctx.send(f"{ctx.author.name} your nickname was reset")
+            else:
+                await member.edit(nick=nickname)
+                await ctx.send(f"{member.name}'s nickname was changed to {nickname}")
+        except Exception as e:
+            await ctx.send(e)
+
+    @commands.command()
+    @commands.cooldown(1, 3, commands.BucketType.user)
+    @commands.guild_only()
+    @commands.has_permissions(ban_members=True)
+    async def unban(self, ctx, id: int = None):
+        if id is None:
+            await ctx.send("Please pass in a ID")
+        else:
+            try:
+                user = await self.bot.fetch_user(id)
+
+                await ctx.guild.unban(user)
+                await ctx.send(f"🟢Successfully unbanned `{user}`")
+            except Exception as e:
+                await ctx.send(e)
+
+    @commands.command()
+    async def purge(self, ctx, limit=0):
+        if limit == 0:
+            await ctx.send("Please pass in a valid amount to purge.")
+        else:
+            await ctx.channel.purge(limit=limit+1)
+            await ctx.send(f"Done. {limit} messages deleted", delete_after=5)
 
 def setup(bot):
-    bot.add_cog(moderation(bot))
+    bot.add_cog(Moderation(bot))

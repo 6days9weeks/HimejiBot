@@ -1,3 +1,10 @@
-- Discord.py(pip install discord.py)
-- Jishaku(pip install jishaku)
-- nekos.py(pip install nekos.py)
+jishaku
+nekos.py
+timeago
+EZPaginator 
+psutil
+discord.py 
+tabulate 
+matplotlib
+git+https://github.com/Rapptz/discord-ext-menus
+babel
