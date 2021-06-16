@@ -1,3 +1,5 @@
+from typing import Optional
+
 from discord.ext import commands
 from discord.utils import get
 import discord
@@ -22,6 +24,8 @@ class Moderation(commands.Cog):
             reason = "No reason passed"
 
         await ctx.guild.ban(member, reason=f"{reason} | Moderator: {ctx.author}")
+        if str(member).startswith("Member ID"):
+            member = await self.bot.fetch_user(int(str(member).replace("Member ID", "")))
         await ctx.send(
             embed=discord.Embed(
                 description=f":red_circle: Successfully banned {member} from this guild.",
@@ -151,6 +155,27 @@ class Moderation(commands.Cog):
                     color=self.bot.ok_color,
                 )
             )
+
+    @commands.command()
+    @commands.has_permissions(manage_channels=True)
+    @commands.bot_has_permissions(manage_channels=True)
+    @commands.cooldown(1, 5, commands.BucketType.user)
+    async def slowmode(
+        self, ctx: commands.Context, chan: Optional[discord.TextChannel] = None, time: int = 0
+    ):
+        """Turn a slowmode delay on a specified channel"""
+        if chan is None:
+            chan = ctx.channel
+        if time > 21600:
+            await ctx.send(
+                embed=discord.Embed(
+                    description="Slowmode delay cannot go longer than 21600 seconds",
+                    color=self.bot.ok_color,
+                )
+            )
+        else:
+            await chan.edit(slowmode_delay=time)
+            await ctx.send(f"{chan.name} now has a slowmode delay of {time} seconds")
 
 
 def setup(bot):

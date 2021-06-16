@@ -321,6 +321,7 @@ class Miscellaneous(commands.Cog):
     @commands.guild_only()
     @commands.cooldown(1, 3, commands.BucketType.user)
     async def userinfo(self, ctx: commands.context, user: discord.Member = None):
+        """Returns info about a user"""
         if user is None:
             user = ctx.author
 
@@ -346,6 +347,38 @@ class Miscellaneous(commands.Cog):
         if user_flags:
             embed.add_field(name="Public User Flags", value=user_flags.upper(), inline=False)
         await ctx.send(embed=embed)
+
+    @commands.command(aliases=["rinfo"])
+    async def roleinfo(self, ctx: commands.Context, *, role: discord.Role):
+        """Returns info about a roloe"""
+        await ctx.send(
+            embed=discord.Embed(title=f"Role info for {role.name}", color=role.color)
+            .add_field(name="ID", value=role.id, inline=True)
+            .add_field(name="Color", value=role.color, inline=True)
+            .add_field(name="Creation Time", value=role.created_at.strftime("%c"), inline=True)
+            .add_field(name="Members", value=len(role.members), inline=True)
+            .add_field(name="Hoisted", value=role.hoist, inline=True)
+            .add_field(name="Mentionable", value=role.mentionable, inline=True)
+            .add_field(name="Position", value=role.position, inline=True)
+            .add_field(
+                name="Permissions",
+                value=f"Click [Here](https://cogs.fixator10.ru/permissions-calculator/?v={role.permissions.value})",
+                inline=True,
+            )
+        )
+
+    @commands.command(aliases=["einfo", "emoteinfo"])
+    async def emojiinfo(self, ctx: commands.Context, emoji: discord.Emoji):
+        """Returns information about a emoji/emote(Within the current guild)"""
+        await ctx.send(embed=discord.Embed(
+            title="Emoji Information",
+            color=self.bot.ok_color
+        )
+        .add_field(name="ID", value=emoji.id, inline=False)
+        .add_field(name="Animated", value=emoji.animated, inline=False)
+        .add_field(name="Link", value=emoji.url, inline=False)
+        .set_image(url=emoji.url)
+        )
 
 
 def setup(bot):
