@@ -1,13 +1,13 @@
+import datetime
 import logging
 
-from colorama import Fore, Style
 from discord.ext import commands
 import discord
 
 from config import FORWARD_DMS
 from utils.classes import HimejiBot
 
-log = logging.getLogger(__name__)
+log = logging.getLogger("Listeners")
 
 
 class Listeners(commands.Cog):
@@ -28,7 +28,7 @@ class Listeners(commands.Cog):
             return
 
         if isinstance(error, commands.NoPrivateMessage):
-            await ctx.send(
+            await ctx.author.send(
                 embed=discord.Embed(
                     description="This command cannot be used in Private Messages",
                     color=self.bot.error_color,
@@ -38,8 +38,8 @@ class Listeners(commands.Cog):
         elif isinstance(error, commands.TooManyArguments):
             await ctx.send(
                 embed=discord.Embed(
-                    description="You passed in a couple uneeded arguments. Please get rid of them and try again",
-                    color=self.error_color,
+                    description="You passed in a couple unneeded arguments. Please get rid of them and try again",
+                    color=self.bot.error_color,
                 )
             )
 
@@ -80,16 +80,25 @@ class Listeners(commands.Cog):
         elif isinstance(error, commands.CommandInvokeError):
             await ctx.send(
                 embed=discord.Embed(
-                    title="Tylerr you fucked up some code",
-                    description=f"```py\n{error}\n```",
+                    title="Oops!",
+                    description=f"It looks like my owner may have messed up some code for this command. ```py\n{error}\n```",
                     color=self.bot.error_color,
+                ).set_footer(
+                    icon_url=ctx.author.avatar.url, text="This incident was reported to my master."
                 )
             )
-            log.error(
-                Fore.RED + f"**{ctx.command.qualified_name} failed to execute**",
-                exc_info=error.original,
+            for owner in self.bot.owner_ids:
+                owner = self.bot.get_user(owner)
+                await owner.send(
+                    embed=discord.Embed(
+                        title="You Baka!",
+                        description=f"`{ctx.command}` errored out in `{ctx.guild}({ctx.guild.id})`\n```py\n{error}\n```",
+                        color=self.bot.error_color,
+                    )
+                )
+            self.bot.logger.error(
+                f"**{ctx.command.qualified_name} failed to execute**", exc_info=error.original
             )
-            print(Style.RESET_ALL + "-" * 15)
 
     @commands.Cog.listener()
     async def on_command_completion(self, ctx: commands.Context):
@@ -98,11 +107,12 @@ class Listeners(commands.Cog):
         if ctx.guild:
             location = ctx.guild.name
             locationID = ctx.guild.id
-        print(Fore.CYAN, f"\rCommand Logger")
-        print(f"Usage: {ctx.message.content}")
-        print(f"Executed In: {location}({locationID})")
-        print(f"Executed By {ctx.author}", Style.RESET_ALL)
-        print("-" * 15)
+        self.bot.logger.info(
+            f"Command Logger\n"
+            f"Usage: {ctx.message.content}\n"
+            f"Executed In: {location}({locationID})\n"
+            f"Executed By {ctx.author}"
+        )
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
@@ -124,10 +134,10 @@ class Listeners(commands.Cog):
                         )
                     )
                 except discord.HTTPException as e:
-                    print(f"Failed to forward dms to the owner due to: {e}")
+                    self.bot.logger.info(f"Failed to forward dms to the owner due to: {e}")
 
     async def edit_process_commands(self, message: discord.Message):
-        """Same as Airi's method (Airi.process_commands), but dont dispatch message_without_command."""
+        """Same as Airi's method (Airi.process_commands), but don't dispatch message_without_command."""
         if not message.author.bot:
             ctx = await self.bot.get_context(message)
             await self.bot.invoke(ctx)

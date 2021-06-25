@@ -51,7 +51,7 @@ class Moderation(commands.Cog):
                 )
                 embed.set_footer(text=f"Moderator: {ctx.author}")
                 await ctx.send(embed=actionembed)
-            except discord.Forbidden:
+            except discord.HTTPException:
                 await ctx.send(
                     embed=discord.Embed(
                         description=f":warning: Failed sending DM to {member}\n**Proceeding with ban regardless.**",
@@ -189,10 +189,11 @@ class Moderation(commands.Cog):
                 embed=discord.Embed(
                     description=f":put_litter_in_its_place: Successfully purged `{amount}` from this channel",
                     color=self.bot.ok_color,
-                )
+                ),
+                delete_after=5,
             )
 
-    @commands.command()
+    @commands.command(aliases=["sm"])
     @commands.has_permissions(manage_channels=True)
     @commands.bot_has_permissions(manage_channels=True)
     @commands.cooldown(1, 5, commands.BucketType.user)

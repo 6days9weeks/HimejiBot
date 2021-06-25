@@ -39,7 +39,7 @@ class Miscellaneous(commands.Cog):
         message = await ctx.reply(embed=emb, mention_author=False)
         ping = (time.monotonic() - before) * 1000
 
-        emb.title = "Pong! 🏓"
+        emb.title = "Pong! :ping_pong:"
         emb.color = self.bot.ok_color
         shards = [
             f"Shard {shard + 1}/{self.bot.shard_count}: {round(pingt * 1000)}ms\n"
@@ -88,7 +88,10 @@ class Miscellaneous(commands.Cog):
                 text_channels += 1
             if isinstance(chan, discord.VoiceChannel):
                 voice_channels += 1
-        embed = discord.Embed(title=f"{self.bot.user.name} Stats", color=self.bot.ok_color)
+        embed = discord.Embed(
+            title=f"{self.bot.user.name} Stats",
+            description=f"Invite me [here](https://discord.com/api/oauth2/authorize?client_id=784474257832804372&scope=bot) and join my Support Server [here](https://discord.gg/Cs5RdJF9pb)",
+        )
         embed.set_thumbnail(url=self.bot.user.avatar.url)
         embed.add_field(name="Author:", value="Tylerr#6979", inline=True)
         embed.add_field(
@@ -331,6 +334,9 @@ class Miscellaneous(commands.Cog):
         embed.set_thumbnail(url=user.avatar.url)
         embed.add_field(name="Name", value=user)
         embed.add_field(name="ID", value=user.id)
+        embed.add_field(
+            name="Status & Activity", value=f"Status: {user.status}\nActivity: {user.activity}"
+        )
         embed.add_field(
             name="Account Creation",
             value=user.created_at.strftime("%c"),

@@ -1,3 +1,4 @@
+from random import choice
 import datetime
 
 from discord.ext import commands, menus
@@ -23,11 +24,64 @@ class Embed(discord.Embed):
         return instance
 
 
-class Nhentai(commands.Cog):
-    """Something for perverts or something idk."""
-
+class NSFW(commands.Cog):
     def __init__(self, bot: HimejiBot):
         self.bot = bot
+
+    @commands.command()
+    async def hentai(self, ctx: commands.Context):
+        """Retrieves a hentai gif/image from nekos.life api endpoint"""
+        endpoints = [
+            "Random_hentai_gif",
+            "pussy",
+            "nsfw_neko_gif",
+            "lewd",
+            "les",
+            "kuni",
+            "cum",
+            "classic",
+            "boobs",
+            "bj",
+            "anal",
+            "yuri",
+            "trap",
+            "tits",
+            "solog",
+            "solo",
+            "pwankg",
+            "pussy_jpg",
+            "lewdkemo",
+            "lewdk",
+            "keta",
+            "hololewd",
+            "holoero",
+            "hentai",
+            "femdom",
+            "feetg",
+            "erofeet",
+            "feet",
+            "ero",
+            "erok",
+            "erokemo",
+            "cum_jpg",
+            "gasm",
+        ]
+        async with self.bot.session.get(
+            f"https://nekos.life/api/v2/img/{choice(endpoints)}"
+        ) as resp:
+            if resp.status == 200:
+                await ctx.send(
+                    embed=discord.Embed(color=self.bot.ok_color).set_image(
+                        url=(await resp.json())["url"]
+                    )
+                )
+            else:
+                await ctx.send(
+                    embed=discord.Embed(
+                        description=f"API returned a {resp.status} status. Try again...",
+                        color=self.bot.error_color,
+                    )
+                )
 
     @commands.group()
     @commands.cooldown(1, 5, commands.BucketType.member)
@@ -90,4 +144,4 @@ class Nhentai(commands.Cog):
 
 
 def setup(bot):
-    bot.add_cog(Nhentai(bot))
+    bot.add_cog(NSFW(bot))
