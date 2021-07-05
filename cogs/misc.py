@@ -1,6 +1,6 @@
 from datetime import datetime
 from io import BytesIO
-from typing import cast, Optional, Union
+from typing import Optional
 import platform
 import time
 
@@ -15,11 +15,14 @@ from utils.funcs import box
 
 
 class Miscellaneous(commands.Cog):
+    """Miscellaneous commands"""
+
     def __init__(self, bot: HimejiBot):
         self.bot = bot
 
     @commands.has_permissions(embed_links=True)
     @commands.command()
+    @commands.cooldown(1, 5, commands.BucketType.user)
     async def ping(
         self,
         ctx: commands.Context,
@@ -62,7 +65,7 @@ class Miscellaneous(commands.Cog):
         await message.edit(embed=emb)
 
     @commands.command()
-    @commands.cooldown(1, 10, commands.BucketType.member)
+    @commands.cooldown(1, 5, commands.BucketType.user)
     async def invite(self, ctx: commands.Context):
         """Invite the bot to your server."""
         embed = discord.Embed(color=self.bot.ok_color, title="<3")
@@ -78,7 +81,17 @@ class Miscellaneous(commands.Cog):
             await ctx.reply(embed=embed, mention_author=False)
 
     @commands.command()
-    @commands.cooldown(1, 10, commands.BucketType.member)
+    @commands.cooldown(1, 5, commands.BucketType.user)
+    async def support(self, ctx: commands.Context):
+        await ctx.send(
+            embed=discord.Embed(
+                description=f"Come see me and my master and the rest of my robotic brothers and sisters [here](https://discord.gg/Cs5RdJF9pb)",
+                color=self.bot.ok_color,
+            ).set_thumbnail(url=self.bot.user.avatar.url)
+        )
+
+    @commands.command()
+    @commands.cooldown(1, 5, commands.BucketType.user)
     async def stats(self, ctx: commands.Context):
         """Some stats about me."""
         text_channels = 0
@@ -91,7 +104,7 @@ class Miscellaneous(commands.Cog):
         embed = discord.Embed(
             title=f"{self.bot.user.name} Stats",
             description=f"Invite me [here](https://discord.com/api/oauth2/authorize?client_id=784474257832804372&scope=bot) and join my Support Server [here](https://discord.gg/Cs5RdJF9pb)",
-            color=self.bot.ok_color
+            color=self.bot.ok_color,
         )
         embed.set_thumbnail(url=self.bot.user.avatar.url)
         embed.add_field(name="Author:", value="Tylerr#6979", inline=True)
@@ -174,8 +187,8 @@ class Miscellaneous(commands.Cog):
             await ctx.reply(embed=e, mention_author=False)
 
     @commands.command()
+    @commands.cooldown(1, 5, commands.BucketType.user)
     @commands.guild_only()
-    @commands.cooldown(1, 10, commands.BucketType.member)
     @commands.bot_has_permissions(embed_links=True)
     async def avatar(self, ctx: commands.Context, user: Optional[discord.Member]):
         """Check your avatars."""
@@ -183,7 +196,12 @@ class Miscellaneous(commands.Cog):
         if user is None:
             user = ctx.author
         ext = "gif" if user.avatar.is_animated() else "png"
-        e = discord.Embed(title=f"{user.name}'s avatar.", color=user.color, url=user.avatar.url)
+        e = discord.Embed(
+            title=f"{user}'s avatar",
+            color=self.bot.ok_color
+        )
+        e.add_field(name="File Format", value=ext)
+        e.add_field(name="Animated", value="\u2705" if user.avatar.is_animated() else ":x :")
         e.set_image(url=f"attachment://aaaaaaaaaaaaaaaaaaaaaaaaa.{ext}")
         e.set_footer(text=f"ID: {user.id}")
         await ctx.send(
@@ -195,194 +213,93 @@ class Miscellaneous(commands.Cog):
         )
 
     @commands.command()
-    @commands.bot_has_permissions(embed_links=True, attach_files=True)
-    @commands.max_concurrency(1, commands.BucketType.user)
-    async def osu(self, ctx: commands.Context, *, user):
-        """Get osu information about someone."""
-        try:
-            async with self.bot.session.get(
-                "https://api.martinebot.com/v1/imagesgen/osuprofile",
-                params={
-                    "player_username": user,
-                },
-                raise_for_status=True,
-            ) as r:
-                pic = BytesIO(await r.read())
-        except aiohttp.ClientResponseError as e:
-            emb = discord.Embed(
-                description=f"Cannot contact the api due to error: [{e.status}] {e.message}",
-                color=self.bot.ok_color,
-            )
-            return await ctx.send(embed=emb)
-        e = discord.Embed(title=f"Here's the osu profile for {user}", color=self.bot.ok_color)
-        if isinstance(pic, BytesIO):
-            e.set_image(url="attachment://osu.png")
-        elif isinstance(pic, str):
-            e.set_footer(text="Api is currently down.")
-
-        await ctx.send(
-            embed=e,
-            file=discord.File(pic, filename="osu.png") if pic else None,
-        )
-        if isinstance(pic, BytesIO):
-            pic.close()
-
-    @commands.command(aliases=["se", "bigmoji", "jumbo"])
-    async def bigemoji(
-        self,
-        ctx: commands.Context,
-        emoji: Union[discord.Emoji, discord.PartialEmoji, str],
-    ) -> None:
-        """
-        Get a emoji in big size lol
-        """
-        await ctx.channel.trigger_typing()
-        if type(emoji) in [discord.PartialEmoji, discord.Emoji]:
-            aa_emoji = cast(discord.Emoji, emoji)
-            ext = "gif" if aa_emoji.animated else "png"
-            url = "https://cdn.discordapp.com/emojis/{id}.{ext}?v=1".format(
-                id=aa_emoji.id, ext=ext
-            )
-            filename = "{name}.{ext}".format(name=aa_emoji.name, ext=ext)
-        else:
-            try:
-                """https://github.com/glasnt/emojificate/blob/master/emojificate/filter.py"""
-                cdn_fmt = "https://twemoji.maxcdn.com/2/72x72/{codepoint:x}.png"
-                url = cdn_fmt.format(codepoint=ord(str(emoji)))
-                filename = "emoji.png"
-            except TypeError:
-                return await ctx.send("That doesn't appear to be a valid emoji")
-        try:
-            async with self.bot.session.get(url) as resp:
-                image = BytesIO(await resp.read())
-        except Exception:
-            return await ctx.send("That doesn't appear to be a valid emoji")
-        await ctx.send(file=discord.File(image, filename=filename))
-
-    @commands.command()
+    @commands.cooldown(1, 5, commands.BucketType.user)
     async def uptime(self, ctx: commands.Context):
         """Shows bot's uptime."""
         since = self.bot.uptime.strftime("%H:%M:%S UTC | %Y-%m-%d")
         delta = datetime.utcnow() - self.bot.uptime
-        uptime_text = humanize.time.precisedelta(delta) or ("Less than one second.")
+        uptime_text = humanize.time.precisedelta(delta) or "Less than one second."
         embed = discord.Embed(colour=self.bot.ok_color)
         embed.add_field(name=f"{self.bot.user.name} has been up for:", value=uptime_text)
         embed.set_footer(text=f"Since: {since}")
         await ctx.reply(embed=embed, mention_author=False)
 
-    @commands.command(aliases=["sinfo", "ginfo", "guildinfo"])
-    async def serverinfo(self, ctx: commands.Context, guild: discord.Guild = None):
-        """Get information about a certain guild"""
-        if guild is None:
-            guild = ctx.guild
-
-        weird_stuff = {
-            "ANIMATED_ICON": ("Animated Icon"),
-            "BANNER": ("Banner Image"),
-            "COMMERCE": ("Commerce"),
-            "COMMUNITY": ("Community"),
-            "DISCOVERABLE": ("Server Discovery"),
-            "FEATURABLE": ("Featurable"),
-            "INVITE_SPLASH": ("Splash Invite"),
-            "MEMBER_LIST_DISABLED": ("Member list disabled"),
-            "MEMBER_VERIFICATION_GATE_ENABLED": ("Membership Screening enabled"),
-            "MORE_EMOJI": ("More Emojis"),
-            "NEWS": ("News Channels"),
-            "PARTNERED": ("Partnered"),
-            "PREVIEW_ENABLED": ("Preview enabled"),
-            "PUBLIC_DISABLED": ("Public disabled"),
-            "VANITY_URL": ("Vanity URL"),
-            "VERIFIED": ("Verified"),
-            "VIP_REGIONS": ("VIP Voice Servers"),
-            "WELCOME_SCREEN_ENABLED": ("Welcome Screen enabled"),
-        }
-        guild_features = [
-            f"✅ {name}\n"
-            for weird_stuff, name in weird_stuff.items()
-            if weird_stuff in guild.features
-        ]
-        embed = discord.Embed(title=guild.name, color=self.bot.ok_color)
-        embed.set_thumbnail(url=guild.icon.url)
-        embed.add_field(
-            name="Owner", value=f"Name: **{guild.owner}**\nID: **{guild.owner.id}**", inline=True
-        )
-        embed.add_field(name="Server ID", value=f"**{guild.id}**", inline=True)
-        embed.add_field(name="Creation Time", value=guild.created_at.strftime("%c"), inline=False)
-        embed.add_field(name="Region", value=str(guild.region).upper(), inline=True)
-        embed.add_field(name="Member Count", value=f"**{guild.member_count}**", inline=True)
-        embed.add_field(name="Role Count", value="**{}**".format(len(guild.roles)), inline=False)
-        embed.add_field(
-            name="Channel Count",
-            value=f"Categories: **{len(guild.categories)}**\nText: **{len(guild.text_channels)}**\nVoice: **{len(guild.voice_channels)}**\nTotal: **{len(guild.text_channels) + len(guild.voice_channels)}**",
-            inline=True,
-        )
-        embed.add_field(name="Emoji Count", value="**{}**".format(len(guild.emojis)), inline=True)
-        if guild_features:
-            embed.add_field(name="Features", value="".join(guild_features), inline=False)
-        await ctx.send(embed=embed)
-
-    @commands.command(aliases=["uinfo", "memberinfo", "minfo"])
-    @commands.guild_only()
-    @commands.cooldown(1, 3, commands.BucketType.user)
-    async def userinfo(self, ctx: commands.context, user: discord.Member = None):
-        """Returns info about a user"""
-        if user is None:
-            user = ctx.author
-
-        user_flags = "\n".join(i.replace("_", " ").title() for i, v in user.public_flags if v)
-        roles = user.roles[-1:0:-1]
-        embed = discord.Embed(color=user.color or self.bot.ok_color)
-        embed.set_thumbnail(url=user.avatar.url)
-        embed.add_field(name="Name", value=user)
-        embed.add_field(name="ID", value=user.id)
-        embed.add_field(
-            name="Status & Activity", value=f"Status: {user.status}\nActivity: {user.activity}"
-        )
-        embed.add_field(
-            name="Account Creation",
-            value=user.created_at.strftime("%c"),
-        )
-        embed.add_field(
-            name=f"{ctx.guild} Join Date", value=user.joined_at.strftime("%c"), inline=False
-        )
-        if roles:
-            embed.add_field(
-                name=f"Roles **{(len(user.roles) - 1)}**",
-                value=", ".join([x.mention for x in roles[:10]]),
-                inline=False,
-            )
-        if user_flags:
-            embed.add_field(name="Public User Flags", value=user_flags.upper(), inline=False)
-        await ctx.send(embed=embed)
-
-    @commands.command(aliases=["rinfo"])
-    async def roleinfo(self, ctx: commands.Context, *, role: discord.Role):
-        """Returns info about a role"""
+    @commands.command(aliases=["modules"])
+    @commands.cooldown(1, 4, commands.BucketType.user)
+    async def cogs(self, ctx: commands.Context):
         await ctx.send(
-            embed=discord.Embed(title=f"Role info for {role.name}", color=role.color)
-            .add_field(name="ID", value=role.id, inline=True)
-            .add_field(name="Color", value=role.color, inline=True)
-            .add_field(name="Creation Time", value=role.created_at.strftime("%c"), inline=True)
-            .add_field(name="Members", value=len(role.members), inline=True)
-            .add_field(name="Hoisted", value=role.hoist, inline=True)
-            .add_field(name="Mentionable", value=role.mentionable, inline=True)
-            .add_field(name="Position", value=role.position, inline=True)
-            .add_field(
-                name="Permissions",
-                value=f"Click [Here](https://cogs.fixator10.ru/permissions-calculator/?v={role.permissions.value})",
-                inline=True,
+            embed=discord.Embed(
+                title=f"{self.bot.user.name}'s available modules/cogs",
+                description="\n".join(sorted(map(str, self.bot.cogs))),
+                color=self.bot.ok_color,
+            ).set_footer(
+                text=f"use {ctx.clean_prefix}help [module] to get info about a module/cog"
             )
         )
 
-    @commands.command(aliases=["einfo", "emoteinfo"])
-    async def emojiinfo(self, ctx: commands.Context, emoji: discord.Emoji):
-        """Returns information about a emoji/emote(Within the current guild)"""
-        await ctx.send(
-            embed=discord.Embed(title="Emoji Information", color=self.bot.ok_color)
-            .add_field(name="ID", value=emoji.id, inline=False)
-            .add_field(name="Animated", value=emoji.animated, inline=False)
-            .add_field(name="Link", value=emoji.url, inline=False)
-            .set_image(url=emoji.url)
+    @commands.command()
+    @commands.cooldown(1, 4, commands.BucketType.user)
+    async def help(self, ctx: commands.Context, target: str = None):
+        """Retrieve info a about a cog or a command"""
+        if not target:
+            await ctx.send(
+                embed=discord.Embed(
+                    title=f"Hi i'm {self.bot.user.name}!",
+                    description=f"{self.bot.user.name} is a WIP all purpose discord bot made in discord.py.",
+                    color=self.bot.ok_color
+            )
+            .set_thumbnail(url=self.bot.user.avatar.url)
+            .add_field(name="Modules", value=f"Run {ctx.clean_prefix}modules to see a list of all my modules", inline=True)
+            .add_field(name="Help", value=f"Run {ctx.clean_prefix}help [module/command] to receive info about a module or command", inline=True)
+            )
+
+        cmd: commands.Command = self.bot.get_command(target.lower())
+
+        if cmd:
+            cmd_aliases = "\n".join(cmd.aliases)
+            return await ctx.send(
+                embed=discord.Embed(
+                    title=f"Command: __{cmd.name}__",
+                    description=f"`Description: {cmd.help}`",
+                    color=self.bot.ok_color,
+                )
+                .add_field(
+                    name="Usage", value=f"`{ctx.clean_prefix}{cmd.name} {'' if not cmd.signature else cmd.signature}`"
+                )
+                .add_field(name="Module", value=f"`{cmd.cog_name}`")
+                .add_field(name=f"Aliases", value="`None`" if not cmd.aliases else f"```{cmd_aliases}```")
+                .set_footer(
+                    text="[] signify optional arguments while <> signify required arguments"
+                )
+            )
+        else:
+            # finds cogs good
+            found = []
+            for c in self.bot.cogs:
+                if c.lower().startswith(target.lower()):
+                    found.append(c)
+                if c.lower() == target.lower():
+                    found = [c]
+                    break
+            if found:
+                cog = self.bot.get_cog(found[0])
+
+                cog_commands = "\n".join(sorted(map(str, cog.get_commands()))) or None
+                return await ctx.send(
+                    embed=discord.Embed(
+                        title=cog.qualified_name or target,
+                        description=f"`Description`: {cog.description or None}\n`Commands`:\n{cog_commands}",
+                        color=self.bot.ok_color,
+                    ).set_footer(
+                        text=f"Use {ctx.clean_prefix}help [command] to get info about any command"
+                    )
+                )
+
+        return await ctx.send(
+            embed=discord.Embed(
+                description=f"Module/Command {target} not found.",
+                color=self.bot.error_color,
+            )
         )
 
 

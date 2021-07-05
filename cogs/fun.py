@@ -1,16 +1,21 @@
+from io import BytesIO
 from random import choice, randint
 
 from discord.ext import commands
+import aiohttp
 import discord
 
 from utils.classes import HimejiBot
 
 
 class Fun(commands.Cog):
+    """Fun related commands"""
+
     def __init__(self, bot: HimejiBot):
         self.bot = bot
 
     @commands.command(name="8ball")
+    @commands.cooldown(1, 5, commands.BucketType.user)
     async def _8ball(self, ctx: commands.Context, *, question):
         """Ask the mystical 8 ball anything. """
         answers = [
@@ -45,6 +50,7 @@ class Fun(commands.Cog):
         )
 
     @commands.command()
+    @commands.cooldown(1, 5, commands.BucketType.user)
     async def compliment(self, ctx: commands.Context, member: discord.Member = None):
         """Compliment someone or yourself"""
         if member is None:
@@ -89,6 +95,7 @@ class Fun(commands.Cog):
         )
 
     @commands.command(aliases=["rng"])
+    @commands.cooldown(1, 5, commands.BucketType.user)
     async def randomnumber(self, ctx, int1: int, int2: int):
         """Generate a random number between the two given fields"""
         try:
@@ -108,6 +115,7 @@ class Fun(commands.Cog):
             )
 
     @commands.command()
+    @commands.cooldown(1, 5, commands.BucketType.user)
     async def owoify(self, ctx: commands.Context, *, txt):
         """Owoify some text"""
         if len(txt) > 200:
@@ -130,6 +138,62 @@ class Fun(commands.Cog):
                         title="OwO here you go.",
                         description=formatted_tuple,
                         color=self.bot.ok_color,
+                    )
+                )
+
+    @commands.command()
+    @commands.cooldown(1, 5, commands.BucketType.user)
+    @commands.bot_has_permissions(embed_links=True, attach_files=True)
+    @commands.max_concurrency(1, commands.BucketType.user)
+    async def osu(self, ctx: commands.Context, *, user):
+        """Get osu information about someone."""
+        try:
+            async with self.bot.session.get(
+                "https://api.martinebot.com/v1/imagesgen/osuprofile",
+                params={
+                    "player_username": user,
+                },
+                raise_for_status=True,
+            ) as r:
+                pic = BytesIO(await r.read())
+        except aiohttp.ClientResponseError as e:
+            emb = discord.Embed(
+                description=f"Cannot contact the api due to error: [{e.status}] {e.message}",
+                color=self.bot.ok_color,
+            )
+            return await ctx.send(embed=emb)
+        e = discord.Embed(title=f"Here's the osu profile for {user}", color=self.bot.ok_color)
+        if isinstance(pic, BytesIO):
+            e.set_image(url="attachment://osu.png")
+        elif isinstance(pic, str):
+            e.set_footer(text="Api is currently down.")
+
+        await ctx.send(
+            embed=e,
+            file=discord.File(pic, filename="osu.png") if pic else None,
+        )
+        if isinstance(pic, BytesIO):
+            pic.close()
+
+    @commands.command(aliases=["aq"])
+    @commands.cooldown(1, 3, commands.BucketType.user)
+    async def animequote(self, ctx: commands.Context):
+        """Recieve an anime quote from the AnimeChan API"""
+        async with self.bot.session.get("https://animechan.vercel.app/api/random") as resp:
+            if resp.status == 200:
+                quote = (await resp.json())["quote"]
+                char = (await resp.json())["character"]
+                anime = (await resp.json())["anime"]
+                await ctx.send(
+                    embed=discord.Embed(
+                        description=f"{quote}\n~{char}", color=self.bot.ok_color
+                    ).set_footer(text=f"Anime: {anime}")
+                )
+            else:
+                await ctx.send(
+                    embed=discord.Embed(
+                        description=f"API threw a {resp.status}. Please try again later.",
+                        color=self.bot.error_color,
                     )
                 )
 

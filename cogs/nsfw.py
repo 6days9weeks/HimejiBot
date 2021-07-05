@@ -25,64 +25,78 @@ class Embed(discord.Embed):
 
 
 class NSFW(commands.Cog):
+    """NSFW related commands"""
+
     def __init__(self, bot: HimejiBot):
         self.bot = bot
 
     @commands.command()
     @commands.is_nsfw()
-    async def hentai(self, ctx: commands.Context):
-        """Retrieves a hentai gif/image from nekos.life api endpoint"""
-        endpoints = [
-            "Random_hentai_gif",
-            "pussy",
-            "nsfw_neko_gif",
-            "lewd",
-            "les",
-            "kuni",
-            "cum",
-            "classic",
-            "boobs",
-            "bj",
-            "anal",
-            "yuri",
-            "trap",
-            "tits",
-            "solog",
-            "solo",
-            "pwankg",
-            "pussy_jpg",
-            "lewdkemo",
-            "lewdk",
-            "keta",
-            "hololewd",
-            "holoero",
-            "hentai",
-            "femdom",
-            "feetg",
-            "erofeet",
-            "feet",
-            "ero",
-            "erok",
-            "erokemo",
-            "cum_jpg",
-            "gasm",
-        ]
-        async with self.bot.session.get(
-            f"https://nekos.life/api/v2/img/{choice(endpoints)}"
-        ) as resp:
-            if resp.status == 200:
+    @commands.cooldown(1, 3, commands.BucketType.user)
+    async def hentai(self, ctx: commands.Context, *, tag: str = None):
+        """Obligatory help command. Run `[p]hentai list` to get all available tags."""
+        endpoints = {
+            "random hentai gif": "Random_hentai_gif",
+            "pussy": "pussy",
+            "nsfw neko gif": "nsfw_neko_gif",
+            "lewd": "lewd",
+            "les": "les",
+            "kuni": "kuni",
+            "cum": "cum",
+            "classic": "classic",
+            "boobs": "boobs",
+            "bj": "bj",
+            "anal": "anal",
+            "yuri": "yuri",
+            "trap": "trap",
+            "tits": "tits",
+            "solog": "solog",
+            "solo": "solo",
+            "pwankg": "pwankg",
+            "pussy jpg": "pussy_jpg",
+            "lewdkemo": "lewdkemo",
+            "lewdk": "lewdk",
+            "keta": "keta",
+            "hololewd": "hololewd",
+            "holoero": "holoero",
+            "hentai": "hentai",
+            "femdom": "femdom",
+            "feetg": "feetg",
+            "erofeet": "erofeet",
+            "feet": "feet",
+            "ero": "ero",
+            "erok": "erok",
+            "erokemo": "erokemo",
+            "cum jpg": "cum_jpg",
+            "gasm": "gasm",
+        }
+
+        if tag is None:
+            tag = choice(list(endpoints.values()))
+
+        if tag is not None and tag.lower() == "list":
+            available_tags = "\n".join(endpoints.keys())
+            return await ctx.send(
+                embed=discord.Embed(
+                    title="Available Tags", description=available_tags, color=self.bot.ok_color
+                )
+            )
+
+        if tag is not None and tag in endpoints.keys():
+            tag = endpoints.get(tag)
+            async with self.bot.session.get(f"https://nekos.life/api/v2/img/{tag}") as resp:
                 await ctx.send(
                     embed=discord.Embed(color=self.bot.ok_color).set_image(
                         url=(await resp.json())["url"]
                     )
                 )
-            else:
-                await ctx.send(
-                    embed=discord.Embed(
-                        description=f"API returned a {resp.status} status. Try again...",
-                        color=self.bot.error_color,
-                    )
+        else:
+            await ctx.send(
+                embed=discord.Embed(
+                    description=f"Tag not found in available tags. Run `{ctx.clean_prefix}hentai list` to see all tags",
+                    color=self.bot.error_color,
                 )
+            )
 
     @commands.group()
     @commands.cooldown(1, 5, commands.BucketType.member)

@@ -20,6 +20,8 @@ START_CODE_BLOCK_RE = re.compile(r"^((```py(thon)?)(?=\s)|(```))")
 
 # most stuffs in this owner cog related to development is from https://github.com/Rapptz/RoboDanny/blob/rewrite/cogs/admin.py
 class BotOwner(commands.Cog):
+    """Bot Owner only commands"""
+
     def __init__(self, bot: HimejiBot):
         self.bot = bot
         self._last_result = None
@@ -126,7 +128,7 @@ class BotOwner(commands.Cog):
             destructive=True,
             confirm="Yes",
             cancel="No",
-            confirm_message="Goodbye then :wave:",
+            confirm_message="Attempting to restart. See you in a bit. :wave:",
             cancel_message="I guess I will stay then",
         ).run():
             await self.bot.close()
@@ -134,7 +136,7 @@ class BotOwner(commands.Cog):
     @commands.command(aliases=["shutdown", "logout", "sleep"])
     @commands.is_owner()
     async def die(self, ctx: commands.Context):
-        """Kills the bot process"""
+        """Kills the bot process. IF BOT IS RUNNING WITH PM2 IT WILL RESTART REGARDLESS."""
         if await ButtonConfirmation(
             ctx,
             "Are you sure you want me to shutdown?",
@@ -204,7 +206,7 @@ class BotOwner(commands.Cog):
         else:
             await chan.send(msg)
 
-    @commands.command(pass_context=True, hidden=True)
+    @commands.command()
     @commands.is_owner()
     async def repl(self, ctx: commands.Context):
         """Launches an interactive REPL session."""
@@ -304,6 +306,7 @@ class BotOwner(commands.Cog):
     @commands.command()
     @commands.is_owner()
     async def dm(self, ctx: commands.Context, user: discord.User, *, msg):
+        """Direct Message A User"""
         try:
             await user.send(
                 embed=discord.Embed(

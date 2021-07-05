@@ -9,6 +9,8 @@ from utils.funcs import check_hierarchy
 
 
 class Moderation(commands.Cog):
+    """Moderation related commands"""
+
     def __init__(self, bot: HimejiBot):
         self.bot = bot
 
@@ -20,7 +22,7 @@ class Moderation(commands.Cog):
     async def ban(
         self,
         ctx: commands.Context,
-        member: Union[discord.Member, int] = None,
+        member: Union[discord.Member, int],
         *,
         reason: str = None,
     ):
