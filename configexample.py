@@ -1,15 +1,7 @@
 BOT_PREFIX = ""
 TOKEN = ""
-APPLICATION_ID = ""
-STARTUP_COGS = [
-    "cogs.general",
-    "cogs.moderation",
-    "cogs.owner",
-    "cogs.errorhandler",
-    "cogs.jishaku",
-    "cogs.fun",
-    "cogs.stats",
-    "cogs.misc",
-    "cogs.anime",
-    "cogs.status",
-]
+APPLICATION_ID = 123
+OWNER_IDS = {}
+FORWARD_DMS = True
+ERROR_COLOR = "#b22222"  # firebrick red hex
+OK_COLOR = "#ffb6c1"  # light pink hex

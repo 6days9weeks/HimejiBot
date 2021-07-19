@@ -1,140 +1,332 @@
-import discord
-import config
+from contextlib import redirect_stdout
 from typing import Optional
+import asyncio
+import inspect
+import io
+import re
+import textwrap
+import traceback
+
 from discord.ext import commands
+from dpy_button_utils import ButtonConfirmation
+import discord
+
+from utils.classes import KurisuBot
+from utils.funcs import box
+import config
+
+START_CODE_BLOCK_RE = re.compile(r"^((```py(thon)?)(?=\s)|(```))")
 
 
-class Owner(commands.Cog):
-    def __init__(self, bot):
+class BotOwner(commands.Cog):
+    """Bot Owner only commands"""
+
+    def __init__(self, bot: KurisuBot):
         self.bot = bot
+        self._last_result = None
+        self.sessions = set()
+
+    @staticmethod
+    def cleanup_code(content):
+        """Automatically removes code blocks from the code."""
+        # remove ```py\n```
+        if content.startswith("```") and content.endswith("```"):
+            return START_CODE_BLOCK_RE.sub("", content)[:-3]
+
+        # remove `foo`
+        return content.strip("` \n")
+
+    @staticmethod
+    def get_syntax_error(self, e):
+        if e.text is None:
+            return f"```py\n{e.__class__.__name__}: {e}\n```"
+        return f'```py\n{e.text}{"^":>{e.offset}}\n{e.__class__.__name__}: {e}```'
+
+    def paginate(self, text: str):
+        """Fix the limit since tyler gay."""
+        last = 0
+        pages = []
+        for curr in range(0, len(text)):
+            if curr % 1980 == 0:
+                pages.append(text[last:curr])
+                last = curr
+                appd_index = curr
+        if appd_index != len(text) - 1:
+            pages.append(text[last:curr])
+        return list(filter(lambda a: a != "", pages))
+
+    @commands.command(name="eval")
+    @commands.is_owner()
+    async def _eval(self, ctx: commands.Context, *, body: str):
+        """Evaluates python code"""
+
+        env = {
+            "bot": self.bot,
+            "ctx": ctx,
+            "channel": ctx.channel,
+            "author": ctx.author,
+            "guild": ctx.guild,
+            "message": ctx.message,
+            "_": self._last_result,
+        }
+
+        env.update(globals())
+
+        body = self.cleanup_code(body)
+        stdout = io.StringIO()
+
+        to_compile = f'async def func():\n{textwrap.indent(body, "  ")}'
+
+        try:
+            exec(to_compile, env)
+        except Exception as e:
+            return await ctx.send(f"```py\n{e.__class__.__name__}: {e}\n```")
+
+        func = env["func"]
+        try:
+            with redirect_stdout(stdout):
+                ret = await func()
+        except Exception as e:
+            value = stdout.getvalue()
+            await ctx.send(f"```py\n{value}{traceback.format_exc()}\n```")
+        else:
+            value = stdout.getvalue()
+            try:
+                await ctx.message.add_reaction("\u2705")
+            except:
+                pass
+
+            if ret is None:
+                try:
+                    return
+                except:
+                    paginated_text = self.paginate(value)
+                    for page in paginated_text:
+                        if page == paginated_text[-1]:
+                            await ctx.send(f"```py\n{page}\n```")
+                            break
+                        await ctx.send(f"```py\n{page}\n```")
+            else:
+                self._last_result = ret
+                try:
+                    await ctx.send(f"```py\n{value}{ret}\n```")
+                except:
+                    paginated_text = self.paginate(f"{value}{ret}")
+                    for page in paginated_text:
+                        if page == paginated_text[-1]:
+                            await ctx.send(f"```py\n{page}\n```")
+                            break
+                        await ctx.send(f"```py\n{page}\n```")
 
     @commands.command()
     @commands.is_owner()
-    async def load(self, ctx, cog):
-        """
-        Load a cog or an extension.
-        """
-        try:
-            self.bot.load_extension(cog)
-            await ctx.send(":ok_hand: Cog Loaded")
-        except commands.ExtensionError as e:
-            await ctx.send(f"{e.__class__.__name__}: {e}")
+    async def restart(self, ctx: commands.Context):
+        """Restarts the bot"""
+        if await ButtonConfirmation(
+            ctx,
+            "Are you sure you want me to restart?",
+            destructive=True,
+            confirm="Yes",
+            cancel="No",
+            confirm_message="Attempting to restart. See you in a bit. :wave:",
+            cancel_message="I guess I will stay then",
+        ).run():
+            await self.bot.close()
 
-    @commands.command(aliases=["logout"])
+    @commands.command(aliases=["shutdown", "logout", "sleep"])
     @commands.is_owner()
-    async def shutdown(self, ctx: commands.Context):
-        """
-        Logs this bot out.
-        """
-
-        await ctx.send("Logging out now\N{HORIZONTAL ELLIPSIS}")
-        await ctx.bot.logout()
+    async def die(self, ctx: commands.Context):
+        """Kills the bot process. IF BOT IS RUNNING WITH PM2 IT WILL RESTART REGARDLESS."""
+        if await ButtonConfirmation(
+            ctx,
+            "Are you sure you want me to shutdown?",
+            destructive=True,
+            confirm="Yes",
+            cancel="No",
+            confirm_message="Goodbye then :wave:",
+            cancel_message="I guess I will stay then",
+        ).run():
+            exit(code=26)
 
     @commands.command()
     @commands.is_owner()
-    async def unload(self, ctx, cog):
-        """Unload a cog or an extension."""
+    async def load(self, ctx: commands.Context, extension):
+        """Load bot extensions"""
         try:
-            self.bot.unload_extension(cog)
-            await ctx.send(":ok_hand: Cog Unloaded")
+            self.bot.load_extension(extension)
+            await ctx.send(
+                embed=discord.Embed(
+                    description=f":inbox_tray: Loaded `{extension}`",
+                    color=self.bot.ok_color,
+                )
+            )
         except commands.ExtensionError as e:
-            await ctx.send(f"{e.__class__.__name__}: {e}")
+            await ctx.send(embed=discord.Embed(description=e, color=self.bot.error_color))
 
     @commands.command()
     @commands.is_owner()
-    async def reload(self, ctx, cog):
-        """Reload a cog or an extension."""
+    async def unload(self, ctx: commands.Context, extension):
+        """Unload bot extensions"""
         try:
-            self.bot.reload_extension(cog)
-            await ctx.send(":ok_hand: Cog Reloaded")
+            self.bot.unload_extension(extension)
+            await ctx.send(
+                embed=discord.Embed(
+                    description=f":outbox_tray: Unloaded `{extension}`",
+                    color=self.bot.ok_color,
+                )
+            )
         except commands.ExtensionError as e:
-            await ctx.send(f"{e.__class__.__name__}: {e}")
+            await ctx.send(embed=discord.Embed(description=e, color=self.bot.error_color))
 
-    @commands.command()  # ill probably make these 2 commands public soon? say/embed once I filter out the default role mentions
+    @commands.command()
+    @commands.is_owner()
+    async def reload(self, ctx: commands.Context, extension):
+        """Reload bot extensions"""
+        try:
+            self.bot.reload_extension(extension)
+            await ctx.send(
+                embed=discord.Embed(
+                    description=f":repeat: Reloaded `{extension}`",
+                    color=self.bot.ok_color,
+                )
+            )
+        except commands.ExtensionError as e:
+            await ctx.send(embed=discord.Embed(description=e, color=self.bot.error_color))
+
+    @commands.command()
     @commands.is_owner()
     async def say(self, ctx, chan: Optional[discord.TextChannel] = None, *, msg):
         """Say something with the bot."""
-        await ctx.message.delete()
+        try:
+            await ctx.message.delete()
+        except discord.HTTPException:
+            pass
         if chan is None:
             await ctx.send(msg)
         else:
             await chan.send(msg)
 
+    @commands.command()  # Command from RoboDanny https://github.com/Rapptz/RoboDanny/blob/rewrite/cogs/admin.py
     @commands.is_owner()
-    @commands.bot_has_permissions(embed_links=True)
+    async def repl(self, ctx: commands.Context):
+        """Launches an interactive REPL session."""
+        variables = {
+            "ctx": ctx,
+            "bot": self.bot,
+            "message": ctx.message,
+            "guild": ctx.guild,
+            "channel": ctx.channel,
+            "author": ctx.author,
+            "_": None,
+        }
+
+        if ctx.channel.id in self.sessions:
+            await ctx.send("Already running a REPL session in this channel. Exit it with `quit`.")
+            return
+
+        self.sessions.add(ctx.channel.id)
+        await ctx.send("Enter code to execute or evaluate. `exit()` or `quit` to exit.")
+
+        def check(m):
+            return (
+                m.author.id == ctx.author.id
+                and m.channel.id == ctx.channel.id
+                and m.content.startswith("`")
+            )
+
+        while True:
+            try:
+                response = await self.bot.wait_for("message", check=check, timeout=10.0 * 60.0)
+            except asyncio.TimeoutError:
+                await ctx.send("Exiting REPL session.")
+                self.sessions.remove(ctx.channel.id)
+                break
+
+            cleaned = self.cleanup_code(response.content)
+
+            if cleaned in ("quit", "exit", "exit()"):
+                await ctx.send("Exiting.")
+                self.sessions.remove(ctx.channel.id)
+                return
+
+            executor = exec
+            if cleaned.count("\n") == 0:
+                # single statement, potentially 'eval'
+                try:
+                    code = compile(cleaned, "<repl session>", "eval")
+                except SyntaxError:
+                    pass
+                else:
+                    executor = eval
+
+            if executor is exec:
+                try:
+                    code = compile(cleaned, "<repl session>", "exec")
+                except SyntaxError as e:
+                    await ctx.send(self.get_syntax_error(e))
+                    continue
+
+            variables["message"] = response
+
+            fmt = None
+            stdout = io.StringIO()
+
+            try:
+                with redirect_stdout(stdout):
+                    result = executor(code, variables)
+                    if inspect.isawaitable(result):
+                        result = await result
+            except Exception as e:
+                value = stdout.getvalue()
+                fmt = f"\n{value}{traceback.format_exc()}\n"
+            else:
+                value = stdout.getvalue()
+                if result is not None:
+                    fmt = f"\n{value}{result}\n"
+                    variables["_"] = result
+                elif value:
+                    fmt = f"\n{value}\n"
+
+            try:
+                if fmt is not None:
+                    if len(fmt) > 2000:
+                        paginated_text = self.paginate(fmt)
+                        for page in paginated_text:
+                            if page == paginated_text[-1]:
+                                await ctx.send(box(f"\n{page}\n", "py"))
+                                break
+                            await ctx.send(box(f"\n{page}\n", "py"))
+                    else:
+                        await ctx.send(box(fmt, "py"))
+            except discord.Forbidden:
+                pass
+            except discord.HTTPException as e:
+                await ctx.send(f"Unexpected error: `{e}`")
+
     @commands.command()
-    async def embed(self, ctx, color: Optional[discord.Color] = None, *, text):
-        """
-        Send an embed.
-        """
-        if color is None:
-            color = await ctx.embed_color()
-        embed = discord.Embed(description=text, color=color)
-        if ctx.message.attachments:
-            content = await ctx.message.attachments[0].to_file()
-            embed.set_image(url="attachment://" + str(content.filename))
+    @commands.is_owner()
+    async def dm(self, ctx: commands.Context, user: discord.User, *, msg):
+        """Direct Message A User"""
+        try:
+            await user.send(
+                embed=discord.Embed(
+                    title=f"Message from {ctx.author}",
+                    description=msg,
+                    color=self.bot.ok_color,
+                )
+            )
             await ctx.send(
-                embed=embed, file=content if ctx.message.attachments else None
+                embed=discord.Embed(
+                    description=f"Direct Message sent to {user}",
+                    color=self.bot.ok_color,
+                )
             )
-        try:
-            await ctx.message.delete()
-        except discord.Forbidden:
-            pass
+        except (discord.HTTPException, discord.Forbidden) as e:
+            await ctx.send(embed=discord.Embed(description=e, color=self.bot.error_color))
 
-    @commands.group()
-    @commands.is_owner()
-    async def blacklist(self, ctx):
-        """Blacklist commands if no subcommand is used send total blacklisted user count."""
-        if ctx.invoked_subcommand is None:
-            embed = discord.Embed(
-                title=f"There are currently a total of {len(config.BLACKLIST)} blacklisted IDS",
-                description=config.BLACKLIST,
-                color=0xFFB6C1,
-            )
-            await ctx.send(embed=embed)
-
-    @blacklist.command(name="add")
-    @commands.is_owner()
-    async def blacklist_add(self, ctx, member: discord.Member):
-        """Add users(s) to blacklist."""
-        config.BLACKLIST.append(member.id)
-        embed = discord.Embed(
-            title=f"User Blacklisted!!!",
-            description=f"`{member.name}` has been sucessfully added to the blacklist.",
-            color=0xFFB6C1,
-        )
-        embed.set_footer(
-            text=f"There is now a total of {len(config.BLACKLIST)} blacklisted users"
-        )
-        await ctx.send(embed=embed)
-
-    @blacklist.command(name="remove")
-    @commands.is_owner()
-    async def blacklist_remove(self, ctx, member=discord.Member):
-        """Remove users(s) from blacklist."""
-        config.BLACKLIST.remove(member.id)
-        embed = discord.Embed(
-            title="User Unblacklisted",
-            description=f"`{member.name}` has been sucessfully removed to the blacklist.",
-            color=0xFFB6C1,
-        )
-        embed.set_footer(
-            text=f"There is now a total of {len(config.BLACKLIST)} blacklisted users"
-        )
-        await ctx.send(embed=embed)
-
-    @commands.command()
-    @commands.is_owner()
-    async def dm(self, ctx, id: int, *, msg):
-        try:
-            await bot.get_user(id).send(msg)
-            await ctx.send("Message Sent!")
-        except (discord.Forbidden, discord.NotFound) as e:
-            await ctx.send(e)
-
+    @commands.command(name="frick", aliases=["sho"])
     @commands.is_owner()
     @commands.guild_only()
-    @commands.command(name="frick", aliases=["sho"], hidden=True)
     async def frick(self, ctx: commands.Context, limit: int = 50) -> None:
         """
         Cleans up the bots messages.
@@ -156,10 +348,34 @@ class Owner(commands.Cog):
             )
 
         await ctx.send(
-            f"Found and deleted `{len(messages)}` of my message(s) out of the last `{limit}` message(s).",
-            delete_after=3,
+            embed=discord.Embed(
+                description=f"Found and deleted `{len(messages)}` of my message(s) out of the last `{limit}` message(s).",
+                color=self.bot.ok_color,
+            )
         )
+
+    @commands.command()
+    @commands.is_owner()
+    async def fetch(self, ctx: commands.Context, id: int):
+        user = await self.bot.fetch_user(id)
+
+        user_flags = "\n".join(i.replace("_", " ").title() for i, v in user.public_flags if v)
+
+        embed = discord.Embed(
+            title=f"User: {user}",
+            description=f"Fetched info for user: `{user}`",
+            color=self.bot.ok_color,
+        )
+        embed.set_thumbnail(url=user.avatar.url)
+        embed.add_field(name="ID", value=f"`{user.id}`")
+        embed.add_field(name="Avatar", value=f"[URL]({user.avatar.url})")
+        embed.add_field(name="Account Creation", value=f"`{user.created_at.strftime('%c')}`")
+        embed.add_field(name="Bot", value="\u2705" if user.bot else ":x:")
+        embed.add_field(name="System", value="\u2705" if user.system else ":x:")
+        if user.public_flags:
+            embed.add_field(name="Public Flags", value=f"```\n{user_flags}\n```")
+        await ctx.send(embed=embed)
 
 
 def setup(bot):
-    bot.add_cog(Owner(bot))
+    bot.add_cog(BotOwner(bot))
