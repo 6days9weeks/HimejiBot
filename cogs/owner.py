@@ -11,18 +11,17 @@ from discord.ext import commands
 from dpy_button_utils import ButtonConfirmation
 import discord
 
-from utils.classes import HimejiBot
+from utils.classes import KurisuBot
 from utils.funcs import box
 import config
 
 START_CODE_BLOCK_RE = re.compile(r"^((```py(thon)?)(?=\s)|(```))")
 
 
-# most stuffs in this owner cog related to development is from https://github.com/Rapptz/RoboDanny/blob/rewrite/cogs/admin.py
 class BotOwner(commands.Cog):
     """Bot Owner only commands"""
 
-    def __init__(self, bot: HimejiBot):
+    def __init__(self, bot: KurisuBot):
         self.bot = bot
         self._last_result = None
         self.sessions = set()
@@ -37,6 +36,7 @@ class BotOwner(commands.Cog):
         # remove `foo`
         return content.strip("` \n")
 
+    @staticmethod
     def get_syntax_error(self, e):
         if e.text is None:
             return f"```py\n{e.__class__.__name__}: {e}\n```"
@@ -121,10 +121,10 @@ class BotOwner(commands.Cog):
     @commands.command()
     @commands.is_owner()
     async def restart(self, ctx: commands.Context):
-        """Restarts out the bot"""
+        """Restarts the bot"""
         if await ButtonConfirmation(
             ctx,
-            "Are you sure you want me to shutdown?",
+            "Are you sure you want me to restart?",
             destructive=True,
             confirm="Yes",
             cancel="No",
@@ -206,7 +206,7 @@ class BotOwner(commands.Cog):
         else:
             await chan.send(msg)
 
-    @commands.command()
+    @commands.command()  # Command from RoboDanny https://github.com/Rapptz/RoboDanny/blob/rewrite/cogs/admin.py
     @commands.is_owner()
     async def repl(self, ctx: commands.Context):
         """Launches an interactive REPL session."""
@@ -353,6 +353,28 @@ class BotOwner(commands.Cog):
                 color=self.bot.ok_color,
             )
         )
+
+    @commands.command()
+    @commands.is_owner()
+    async def fetch(self, ctx: commands.Context, id: int):
+        user = await self.bot.fetch_user(id)
+
+        user_flags = "\n".join(i.replace("_", " ").title() for i, v in user.public_flags if v)
+
+        embed = discord.Embed(
+            title=f"User: {user}",
+            description=f"Fetched info for user: `{user}`",
+            color=self.bot.ok_color,
+        )
+        embed.set_thumbnail(url=user.avatar.url)
+        embed.add_field(name="ID", value=f"`{user.id}`")
+        embed.add_field(name="Avatar", value=f"[URL]({user.avatar.url})")
+        embed.add_field(name="Account Creation", value=f"`{user.created_at.strftime('%c')}`")
+        embed.add_field(name="Bot", value="\u2705" if user.bot else ":x:")
+        embed.add_field(name="System", value="\u2705" if user.system else ":x:")
+        if user.public_flags:
+            embed.add_field(name="Public Flags", value=f"```\n{user_flags}\n```")
+        await ctx.send(embed=embed)
 
 
 def setup(bot):

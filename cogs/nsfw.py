@@ -6,7 +6,7 @@ from hentai import Format, Hentai, Tag, Utils
 import discord
 
 from config import OK_COLOR
-from utils.classes import EmbedListMenu, HimejiBot
+from utils.classes import EmbedListMenu, KurisuBot
 
 embed_color = OK_COLOR.replace("#", "0x")
 
@@ -27,7 +27,7 @@ class Embed(discord.Embed):
 class NSFW(commands.Cog):
     """NSFW related commands"""
 
-    def __init__(self, bot: HimejiBot):
+    def __init__(self, bot: KurisuBot):
         self.bot = bot
 
     @commands.command()
@@ -94,6 +94,80 @@ class NSFW(commands.Cog):
             await ctx.send(
                 embed=discord.Embed(
                     description=f"Tag not found in available tags. Run `{ctx.clean_prefix}hentai list` to see all tags",
+                    color=self.bot.error_color,
+                )
+            )
+
+    @commands.command(aliases=["hb"])
+    @commands.is_nsfw()
+    @commands.cooldown(1, 3, commands.BucketType.user)
+    async def hentaibomb(self, ctx: commands.Context, *, tag: str = None):
+        """Post 5 hentai images from Waifu.pics API. Run [p]hentaibomb list for available tags"""
+        available_tags = ["waifu", "neko", "trap", "blowjob"]
+
+        if tag is None:
+            tag = choice(available_tags)
+
+        if tag is not None and tag.lower() == "list":
+            tags = "\n".join(available_tags)
+            return await ctx.send(
+                embed=discord.Embed(
+                    title="Available Tags", description=tags, color=self.bot.ok_color
+                )
+            )
+
+        if tag is not None and tag.lower() in available_tags:
+            async with self.bot.session.post(
+                url=f"https://api.waifu.pics/many/nsfw/{tag}",
+                headers={"Accept": "application/json", "content-type": "application/json"},
+                json={"files": ""},
+            ) as resp:
+                results = (await resp.json())["files"][:5]
+                await ctx.send("\n".join(results))
+        else:
+            await ctx.send(
+                embed=discord.Embed(
+                    title="TAG NOT FOUND",
+                    description=f"{tag} was not found in the available tag list. Please run `{ctx.clean_prefix}hb list`",
+                    color=self.bot.error_color,
+                )
+            )
+
+    @commands.command()
+    @commands.cooldown(1, 5, commands.BucketType.user)
+    async def hentainuke(self, ctx: commands.Context, *, tag: str = None):
+        """Post 30 hentai images from Waifu.pics API. Run [p]hentainuke list for available tags"""
+        available_tags = ["waifu", "neko", "trap", "blowjob"]
+
+        if tag is None:
+            tag = choice(available_tags)
+
+        if tag is not None and tag.lower() == "list":
+            tags = "\n".join(available_tags)
+            return await ctx.send(
+                embed=discord.Embed(
+                    title="Available Tags", description=tags, color=self.bot.ok_color
+                )
+            )
+
+        if tag is not None and tag.lower() in available_tags:
+            async with self.bot.session.post(
+                url=f"https://api.waifu.pics/many/nsfw/{tag}",
+                headers={"Accept": "application/json", "content-type": "application/json"},
+                json={"files": ""},
+            ) as resp:
+                step = 5  # the amount of files to display at a time
+                idx = 5  # set the index to start with
+                files = (await resp.json())["files"]
+                while idx < len(files):
+                    sublist = files[idx - step : idx]  # [0:5], [5:10], etc
+                    await ctx.send("\n".join(map(str, sublist)))
+                    idx += step
+        else:
+            await ctx.send(
+                embed=discord.Embed(
+                    title="TAG NOT FOUND",
+                    description=f"{tag} was not found in the available tag list. Please run `{ctx.clean_prefix}hb list`",
                     color=self.bot.error_color,
                 )
             )

@@ -4,14 +4,14 @@ from discord.ext import commands
 from discord.utils import get
 import discord
 
-from utils.classes import HimejiBot
+from utils.classes import KurisuBot
 from utils.funcs import check_hierarchy
 
 
 class Moderation(commands.Cog):
     """Moderation related commands"""
 
-    def __init__(self, bot: HimejiBot):
+    def __init__(self, bot: KurisuBot):
         self.bot = bot
 
     @commands.command()
@@ -47,21 +47,21 @@ class Moderation(commands.Cog):
                         color=self.bot.ok_color,
                     ).set_footer(text=f"Moderator: {ctx.author}")
                 )
-                await member.ban(reason=f"{reason} | Moderator: {ctx.author}")
-                embed = discord.Embed(
-                    description=f"Banned {member} for {reason}", color=self.bot.ok_color
-                )
-                embed.set_footer(text=f"Moderator: {ctx.author}")
-                await ctx.send(embed=actionembed)
-            except discord.HTTPException:
+            except (discord.Forbidden, discord.HTTPException):
                 await ctx.send(
                     embed=discord.Embed(
-                        description=f":warning: Failed sending DM to {member}\n**Proceeding with ban regardless.**",
+                        description=f"Failed sending punishment DM to {member.mention}\nProceeding with Ban regardless.",
                         color=self.bot.error_color,
                     )
                 )
-                await member.ban(reason=f"{reason} | Moderator: {ctx.author}")
-                await ctx.send(embed=actionembed)
+            await member.ban(reason=f"Reason: {reason} | Moderator: {ctx.author}")
+            await ctx.send(
+                embed=discord.Embed(
+                    description=f":red_circle: Successfully banned {member.mention} for {reason}",
+                    color=self.bot.ok_color,
+                )
+            )
+
         if isinstance(member, int):
             user = await self.bot.fetch_user(member)
             await ctx.guild.ban(user, reason=f"{reason} | Moderator: {ctx.author}")
@@ -130,9 +130,9 @@ class Moderation(commands.Cog):
             return
         if reason is None:
             reason = "No reason added"
-        if not get(ctx.guild.roles, name="Himeji-Mute"):
+        if not get(ctx.guild.roles, name="Kurisu-Mute"):
             role = await ctx.guild.create_role(
-                name="Himeji-Mute", permissions=discord.Permissions(send_messages=False)
+                name="Kurisu-Mute", permissions=discord.Permissions(send_messages=False)
             )
             for chan in ctx.guild.text_channels:
                 await chan.set_permissions(role, send_messages=False)
@@ -144,8 +144,8 @@ class Moderation(commands.Cog):
                     color=self.bot.ok_color,
                 )
             )
-        elif get(ctx.guild.roles, name="Himeji-Mute"):
-            await member.add_roles(get(ctx.guild.roles, name="Himeji-Mute"))
+        elif get(ctx.guild.roles, name="Kurisu-Mute"):
+            await member.add_roles(get(ctx.guild.roles, name="Kurisu-Mute"))
             await ctx.send(
                 embed=discord.Embed(
                     description=f":shushing_face: Successfully muted `{member}` for `{reason}`",
@@ -160,14 +160,14 @@ class Moderation(commands.Cog):
     @commands.cooldown(1, 3, commands.BucketType.guild)
     async def unmute(self, ctx: commands.Context, member: discord.Member):
         """Unmute a member"""
-        if not get(ctx.guild.roles, name="Himeji-Mute") in member.roles:
+        if not get(ctx.guild.roles, name="Kurisu-Mute") in member.roles:
             await ctx.send(
                 embed=discord.Embed(
                     description=f"{member} is not muted.", color=self.bot.error_color
                 )
             )
-        elif get(ctx.guild.roles, name="Himeji-Mute") in member.roles:
-            await member.remove_roles(get(ctx.guild.roles, name="Himeji-Mute"))
+        elif get(ctx.guild.roles, name="Kurisu-Mute") in member.roles:
+            await member.remove_roles(get(ctx.guild.roles, name="Kurisu-Mute"))
             await ctx.send(
                 embed=discord.Embed(
                     description=f":unlock: Successfully unmuted `{member}`",

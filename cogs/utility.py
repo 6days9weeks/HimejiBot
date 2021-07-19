@@ -1,16 +1,16 @@
 from io import BytesIO
-from typing import cast, Union
+from typing import cast, Optional, Union
 
 from discord.ext import commands
 import discord
 
-from utils.classes import HimejiBot
+from utils.classes import KurisuBot
 
 
 class Utility(commands.Cog):
     """Some utility commands"""
 
-    def __init__(self, bot: HimejiBot):
+    def __init__(self, bot: KurisuBot):
         self.bot = bot
 
     @commands.command(aliases=["sinfo", "ginfo", "guildinfo"])
@@ -163,6 +163,90 @@ class Utility(commands.Cog):
         except Exception:
             return await ctx.send("That doesn't appear to be a valid emoji")
         await ctx.send(file=discord.File(image, filename=filename))
+
+    @commands.command(aliases=["av"])
+    @commands.cooldown(1, 5, commands.BucketType.user)
+    @commands.guild_only()
+    @commands.bot_has_permissions(embed_links=True)
+    async def avatar(self, ctx: commands.Context, user: Optional[discord.Member]):
+        """Check your avatars."""
+        await ctx.channel.trigger_typing()
+        if user is None:
+            user = ctx.author
+        av = user.avatar
+        e = discord.Embed(title=f"{user}'s avatar", color=self.bot.ok_color)
+        e.add_field(
+            name="File Formations",
+            value=f"[jpg]({av.with_format('jpg')}), "
+            f"[png]({av.with_format('png')}), "
+            f"[webp]({av.with_format('webp')}){',' if av.is_animated() else ''} "
+            f"{f'[gif]({av})' if av.is_animated() else ''}",
+        )
+        e.add_field(name="Animated", value="\u2705" if av.is_animated() else ":x:")
+        e.set_image(url=av.with_size(4096))
+        e.set_footer(text=f"ID: {user.id}")
+        await ctx.send(embed=e)
+
+    @commands.command(aliases=["setnsfw"])
+    @commands.has_permissions(manage_channels=True)
+    @commands.bot_has_permissions(manage_channels=True)
+    async def nsfw(self, ctx: commands.Context):
+        """Toggle nsfw flag on the current channel"""
+        if not ctx.channel.is_nsfw():
+            await ctx.channel.edit(nsfw=True)
+            await ctx.send(f"`{ctx.channel.name}` NSFW flag has been toggled to True")
+        else:
+            await ctx.channel.edit(nsfw=False)
+            await ctx.send(f"`{ctx.channel.name}` NSFW flag has been toggled to False")
+
+    @commands.command()
+    @commands.has_permissions(manage_guild=True)
+    @commands.bot_has_permissions(manage_guild=True)
+    async def setafktimeout(self, ctx: commands.Context, timeout: str):
+        """Set the afk timeout for this server. Run [p]setafktimeout timelist for a list for all available times"""
+        timeouts = {
+            "1m": ["60", "1 Minute"],
+            "5m": ["300", "5 Minutes"],
+            "15m": ["900", "15 Minutes"],
+            "30m": ["1800", "30 Minutes"],
+            "1h": ["3600", "1 Hour"],
+        }
+        if timeout == "timelist":
+            return await ctx.send(
+                embed=discord.Embed(
+                    title="Available timeouts",
+                    description="```\n" + "\n".join(timeouts.keys()) + "\n```",
+                    color=self.bot.ok_color,
+                )
+            )
+        if timeout.lower() in timeouts.keys():
+            await ctx.guild.edit(afk_timeout=int(timeouts[timeout.lower()][0]))
+            await ctx.send(
+                embed=discord.Embed(
+                    description=f"Set AFK timeout to `{timeouts[timeout.lower()][1]}`",
+                    color=self.bot.ok_color,
+                )
+            )
+
+    @commands.command()
+    @commands.has_permissions(manage_guild=True)
+    @commands.bot_has_permissions(manage_guild=True)
+    async def setafkchannel(self, ctx: commands.Context, channel: discord.VoiceChannel = None):
+        """Set the channel to where people go when they hit the AFK timeout. Pass in None for no Inactive Channel"""
+        if channel is None:
+            await ctx.guild.edit(afk_channel=channel)
+            return await ctx.send(
+                embed=discord.Embed(description="Removed AFK channel", color=self.bot.ok_color)
+            )
+
+        if channel:
+            await ctx.guild.edit(afk_channel=channel)
+            await ctx.send(
+                embed=discord.Embed(
+                    description=f"Set AFK timeout channel to `{channel.name}`",
+                    color=self.bot.ok_color,
+                )
+            )
 
 
 def setup(bot):
